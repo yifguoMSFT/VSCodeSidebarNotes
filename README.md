@@ -1,6 +1,8 @@
 # Sticky Sidebar Notes
 
-A always-editable markdown notepad sidebar for VS Code and Cursor. Notes live in a plain text file in your workspace, persist across restarts, and update live when Claude (or any other tool) writes to the file.
+A rendered markdown notepad sidebar for VS Code and Cursor. Notes live in a plain text file in your workspace, persist across restarts, render as formatted markdown, and update live when Claude (or any other tool) writes to the file.
+
+> Forked from [DeviationLabs/homely-vibes](https://github.com/DeviationLabs/homely-vibes.git).
 
 ## Installation
 
@@ -20,19 +22,20 @@ cursor --install-extension vscode-sidebar-notes-0.1.0.vsix
 
 ## Features
 
-- **Always editable**: the sidebar is a plain textarea — no toggle needed, just start typing.
-- **Immediate sync**: every keystroke saves to disk instantly. No debounce delay by default.
-- **Live reload**: external edits (from Claude, `git pull`, another editor) refresh the sidebar immediately without losing your cursor position.
-- **White background**: clean notepad aesthetic regardless of your editor theme.
-- **Workspace-aware**: each workspace gets its own `sidebar-notes.md`. Falls back to a configurable global file when no workspace is open.
+- **Rendered markdown**: the sidebar shows your notes as formatted markdown (headings, lists, code, tables, links), not raw text.
+- **Read-only view**: the sidebar is for viewing; edit the underlying file in a normal editor tab.
+- **Live reload**: external edits (from Claude, `git pull`, another editor) refresh the sidebar immediately.
+- **Clickable links**: markdown links open in VS Code — relative paths resolve against the notes file, `/path` is workspace-root-relative, and `http(s)`/`mailto` open externally.
+- **Customizable styles**: a user CSS file (in your profile's global storage) controls the rendered look and live-reloads when edited.
+- **Workspace-aware**: each workspace gets its own notes file. Falls back to a configurable global file when no workspace is open.
 - **Published to both marketplaces**: available on VS Code Marketplace and Cursor (Open VSX).
 
 ## Usage
 
 1. Click the **Sticky Sidebar Notes** icon in the activity bar.
-2. The sidebar shows `sidebar-notes.md` from your workspace root — created automatically on first save.
-3. Type directly in the sidebar; changes write to disk immediately.
-4. Click the filename in the status line to open the file in a regular editor tab.
+2. The sidebar renders `sidebar-notes.md` from your workspace root — created automatically on first open.
+3. Click the 📝 toolbar button to open the notes file in a regular editor tab and edit it.
+4. Click the 🎨 toolbar button to open and customize the rendering CSS; the view live-reloads on save.
 5. Have Claude write to the file and watch the sidebar update live:
    ```
    Append a one-paragraph summary of this session to sidebar-notes.md.
@@ -44,7 +47,6 @@ cursor --install-extension vscode-sidebar-notes-0.1.0.vsix
 | --- | --- | --- |
 | `sidebarNotes.fileName` | `sidebar-notes.md` | Workspace-relative path of the notes file. |
 | `sidebarNotes.globalFile` | _(empty)_ | Absolute path used when no workspace is open. |
-| `sidebarNotes.debounceMs` | `0` | Milliseconds between keystroke and save. `0` = immediate. |
 
 ## Development
 

@@ -1,10 +1,11 @@
 import * as vscode from "vscode";
 import * as fs from "fs/promises";
 import * as path from "path";
+import { marked } from "marked";
 
 interface InboundMessage {
-  type: "save" | "ready" | "openFile";
-  text?: string;
+  type: "ready" | "openFile" | "openLink";
+  href?: string;
 }
 
 export class NotesViewProvider implements vscode.WebviewViewProvider {
@@ -12,8 +13,7 @@ export class NotesViewProvider implements vscode.WebviewViewProvider {
 
   private view?: vscode.WebviewView;
   private watcher?: vscode.FileSystemWatcher;
-  private writingOurselves = false;
-  private debounceTimer?: NodeJS.Timeout;
+  private stylesWatcher?: vscode.FileSystemWatcher;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     context.subscriptions.push(
@@ -34,29 +34,41 @@ export class NotesViewProvider implements vscode.WebviewViewProvider {
     this.view = view;
     view.webview.options = {
       enableScripts: true,
-      localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, "media")],
+      localResourceRoots: [
+        vscode.Uri.joinPath(this.context.extensionUri, "media"),
+        this.context.globalStorageUri,
+      ],
     };
-    view.webview.html = this.renderHtml(view.webview);
 
     view.webview.onDidReceiveMessage((m: InboundMessage) => this.handleMessage(m));
     view.onDidDispose(() => {
       this.view = undefined;
       this.watcher?.dispose();
       this.watcher = undefined;
+      this.stylesWatcher?.dispose();
+      this.stylesWatcher = undefined;
+    });
+
+    void this.ensureStylesFile().then(() => {
+      if (this.view) this.view.webview.html = this.renderHtml(this.view.webview);
     });
 
     this.rewatch();
+    this.watchStyles();
   }
 
   public async reloadFromDisk(): Promise<void> {
     if (!this.view) return;
     const filePath = this.resolveFilePath();
     if (!filePath) {
-      this.postState({ text: "", filePath: "", missing: true });
+      this.view.title = "Notes";
+      this.postState({ html: "", filePath: "", missing: true });
       return;
     }
+    this.view.title = path.basename(filePath);
     const text = await this.readOrEmpty(filePath);
-    this.postState({ text, filePath, missing: false });
+    const html = marked.parse(text, { async: false }) as string;
+    this.postState({ html, filePath, missing: false });
   }
 
   public async openInEditor(): Promise<void> {
@@ -70,6 +82,12 @@ export class NotesViewProvider implements vscode.WebviewViewProvider {
     await vscode.window.showTextDocument(doc);
   }
 
+  public async openStyles(): Promise<void> {
+    await this.ensureStylesFile();
+    const doc = await vscode.workspace.openTextDocument(this.stylesFsPath());
+    await vscode.window.showTextDocument(doc);
+  }
+
   private handleMessage(m: InboundMessage): void {
     if (m.type === "ready") {
       void this.reloadFromDisk();
@@ -79,31 +97,53 @@ export class NotesViewProvider implements vscode.WebviewViewProvider {
       void this.openInEditor();
       return;
     }
-    if (m.type === "save" && typeof m.text === "string") {
-      this.scheduleSave(m.text);
+    if (m.type === "openLink" && typeof m.href === "string") {
+      void this.openLink(m.href);
+      return;
     }
   }
 
-  private scheduleSave(text: string): void {
-    const cfg = vscode.workspace.getConfiguration("sidebarNotes");
-    const delay = cfg.get<number>("debounceMs", 0);
-    if (this.debounceTimer) clearTimeout(this.debounceTimer);
-    this.debounceTimer = setTimeout(() => void this.writeToDisk(text), delay);
-  }
+  private async openLink(href: string): Promise<void> {
+    // External / absolute URIs (http, https, mailto, vscode, etc.) open via VS Code.
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(href) || /^mailto:/i.test(href)) {
+      await vscode.env.openExternal(vscode.Uri.parse(href));
+      return;
+    }
 
-  private async writeToDisk(text: string): Promise<void> {
-    const filePath = this.resolveFilePath();
-    if (!filePath) return;
+    // Strip any anchor/query fragment from the path portion.
+    const [rawPath] = href.split(/[?#]/);
+    if (!rawPath) return;
+
+    const decoded = decodeURIComponent(rawPath);
+    const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const notesFile = this.resolveFilePath();
+    const baseDir = notesFile ? path.dirname(notesFile) : workspaceDir;
+
+    let target: string;
+    if (/^[/\\]/.test(decoded)) {
+      // Leading slash = workspace-root-relative.
+      if (!workspaceDir) return;
+      target = path.join(workspaceDir, decoded.replace(/^[/\\]+/, ""));
+    } else if (path.isAbsolute(decoded)) {
+      target = decoded;
+    } else {
+      if (!baseDir) return;
+      target = path.resolve(baseDir, decoded);
+    }
+
     try {
-      await fs.mkdir(path.dirname(filePath), { recursive: true });
-      this.writingOurselves = true;
-      await fs.writeFile(filePath, text, "utf8");
-    } catch (err) {
-      vscode.window.showErrorMessage(`Sidebar Notes: failed to save: ${err}`);
-    } finally {
-      setTimeout(() => {
-        this.writingOurselves = false;
-      }, 200);
+      await fs.access(target);
+    } catch {
+      vscode.window.showWarningMessage(`Sidebar Notes: file not found: ${target}`);
+      return;
+    }
+
+    const uri = vscode.Uri.file(target);
+    if (/\.md$/i.test(target)) {
+      await vscode.commands.executeCommand("markdown.showPreview", uri);
+    } else {
+      const doc = await vscode.workspace.openTextDocument(uri);
+      await vscode.window.showTextDocument(doc);
     }
   }
 
@@ -122,7 +162,6 @@ export class NotesViewProvider implements vscode.WebviewViewProvider {
       this.watcher = vscode.workspace.createFileSystemWatcher(filePath);
     }
     const onChange = () => {
-      if (this.writingOurselves) return;
       void this.reloadFromDisk();
     };
     this.watcher.onDidChange(onChange);
@@ -158,7 +197,38 @@ export class NotesViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private postState(state: { text: string; filePath: string; missing: boolean }): void {
+  private stylesFsPath(): string {
+    return path.join(this.context.globalStorageUri.fsPath, "notes-styles.css");
+  }
+
+  private async ensureStylesFile(): Promise<void> {
+    const dest = this.stylesFsPath();
+    try {
+      await fs.access(dest);
+    } catch {
+      const src = path.join(this.context.extensionUri.fsPath, "media", "main.css");
+      const css = await this.readOrEmpty(src);
+      await fs.mkdir(path.dirname(dest), { recursive: true });
+      await fs.writeFile(dest, css, "utf8");
+    }
+  }
+
+  private watchStyles(): void {
+    this.stylesWatcher?.dispose();
+    const dir = this.context.globalStorageUri.fsPath;
+    this.stylesWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(vscode.Uri.file(dir), "notes-styles.css"),
+    );
+    const reload = () => {
+      if (this.view) this.view.webview.html = this.renderHtml(this.view.webview);
+    };
+    this.stylesWatcher.onDidChange(reload);
+    this.stylesWatcher.onDidCreate(reload);
+    this.stylesWatcher.onDidDelete(reload);
+    this.context.subscriptions.push(this.stylesWatcher);
+  }
+
+  private postState(state: { html: string; filePath: string; missing: boolean }): void {
     this.view?.webview.postMessage({ type: "state", ...state });
   }
 
@@ -175,16 +245,19 @@ export class NotesViewProvider implements vscode.WebviewViewProvider {
     const mediaUri = (file: string) =>
       webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", file));
 
+    const stylesUri = webview
+      .asWebviewUri(vscode.Uri.joinPath(this.context.globalStorageUri, "notes-styles.css"))
+      .with({ query: `v=${Date.now()}` });
+
     return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta http-equiv="Content-Security-Policy" content="${csp}" />
-  <link rel="stylesheet" href="${mediaUri("main.css")}" />
+  <link rel="stylesheet" href="${stylesUri}" />
 </head>
 <body>
-  <div id="status"></div>
-  <textarea id="editor" spellcheck="false"></textarea>
+  <div id="content"></div>
   <script nonce="${nonce}" src="${mediaUri("main.js")}"></script>
 </body>
 </html>`;

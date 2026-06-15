@@ -10,6 +10,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand("sidebarNotes.refresh", () => provider.reloadFromDisk()),
     vscode.commands.registerCommand("sidebarNotes.openFile", () => provider.openInEditor()),
+    vscode.commands.registerCommand("sidebarNotes.openStyles", () => provider.openStyles()),
   );
 }
 
