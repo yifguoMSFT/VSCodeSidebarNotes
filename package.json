@@ -97,7 +97,7 @@
       "properties": {
         "sidebarNotes.fileName": {
           "type": "string",
-          "default": "sidebar-notes.md",
+          "default": "notes.md",
           "description": "Workspace-relative path of the markdown file to display."
         },
         "sidebarNotes.globalFile": {

@@ -188,7 +188,7 @@ export class NotesViewProvider implements vscode.WebviewViewProvider {
 
   private resolveFilePath(): string | undefined {
     const cfg = vscode.workspace.getConfiguration("sidebarNotes");
-    const fileName = cfg.get<string>("fileName", "sidebar-notes.md");
+    const fileName = cfg.get<string>("fileName", "notes.md");
     const globalFile = cfg.get<string>("globalFile", "");
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (folder) return path.join(folder.uri.fsPath, fileName);

@@ -33,19 +33,19 @@ cursor --install-extension vscode-sidebar-notes-0.1.0.vsix
 ## Usage
 
 1. Click the **Sticky Sidebar Notes** icon in the activity bar.
-2. The sidebar renders `sidebar-notes.md` from your workspace root — created automatically on first open.
+2. The sidebar renders `notes.md` from your workspace root — created automatically on first open.
 3. Click the 📝 toolbar button to open the notes file in a regular editor tab and edit it.
 4. Click the 🎨 toolbar button to open and customize the rendering CSS; the view live-reloads on save.
 5. Have Claude write to the file and watch the sidebar update live:
    ```
-   Append a one-paragraph summary of this session to sidebar-notes.md.
+   Append a one-paragraph summary of this session to notes.md.
    ```
 
 ## Settings
 
 | Setting | Default | Description |
 | --- | --- | --- |
-| `sidebarNotes.fileName` | `sidebar-notes.md` | Workspace-relative path of the notes file. |
+| `sidebarNotes.fileName` | `notes.md` | Workspace-relative path of the notes file. |
 | `sidebarNotes.globalFile` | _(empty)_ | Absolute path used when no workspace is open. |
 
 ## Development
