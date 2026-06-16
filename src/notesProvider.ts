@@ -88,6 +88,22 @@ export class NotesViewProvider implements vscode.WebviewViewProvider {
     await vscode.window.showTextDocument(doc);
   }
 
+  public async clearNotes(): Promise<void> {
+    const filePath = this.resolveFilePath();
+    if (!filePath) {
+      vscode.window.showWarningMessage("Sidebar Notes: no workspace folder and no global file configured.");
+      return;
+    }
+    await this.ensureFileExists(filePath);
+    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
+    if (doc.getText().length === 0) return;
+    // Edit through an editor so the change lands in VS Code's undo history (revertable with Ctrl+Z).
+    const editor = await vscode.window.showTextDocument(doc, { preview: false });
+    const fullRange = new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length));
+    await editor.edit((b) => b.delete(fullRange));
+    await doc.save();
+  }
+
   private handleMessage(m: InboundMessage): void {
     if (m.type === "ready") {
       void this.reloadFromDisk();

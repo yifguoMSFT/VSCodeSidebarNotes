@@ -66,6 +66,20 @@ npm run package          # production bundle
 npm run package-vsix     # produces vscode-sidebar-notes-<version>.vsix
 ```
 
+### Installing a local build
+
+```bash
+code --install-extension vscode-sidebar-notes-<version>.vsix --force
+```
+
+> **Heads up (Windows):** if `code` resolves to `Code.exe` (the GUI) instead of
+> the CLI wrapper, `--install-extension` is ignored and a new window just opens
+> with nothing installed. Check with `Get-Command code -All`; if the first match
+> is `Code.exe`, call the CLI wrapper directly, e.g.
+> `& "F:\Microsoft VS Code\bin\code.cmd" --install-extension <vsix> --force`.
+> Also bump the `version` in `package.json` so VS Code replaces the cached copy
+> rather than skipping the reinstall.
+
 ### Publishing
 
 PATs are stored in `config/local.yaml` (gitignored) under `vscode_marketplace.pat` and `open_vsx.pat`.

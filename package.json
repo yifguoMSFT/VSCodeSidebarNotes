@@ -2,7 +2,7 @@
   "name": "vscode-sidebar-notes",
   "displayName": "Sticky Sidebar Notes",
   "description": "Markdown sidebar that persists across restarts and is writable by Claude. Successor to the original Sidebar Notes.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "deviationlabs",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -53,6 +53,11 @@
         "icon": "media/open.svg"
       },
       {
+        "command": "sidebarNotes.clear",
+        "title": "Clear Notes",
+        "icon": "media/clear.svg"
+      },
+      {
         "command": "sidebarNotes.openStyles",
         "title": "Edit Notes Styles",
         "icon": "media/styles.svg"
@@ -71,14 +76,19 @@
           "group": "navigation@1"
         },
         {
-          "command": "sidebarNotes.openFile",
+          "command": "sidebarNotes.openStyles",
           "when": "view == sidebarNotes.view",
           "group": "navigation@2"
         },
         {
-          "command": "sidebarNotes.openStyles",
+          "command": "sidebarNotes.clear",
           "when": "view == sidebarNotes.view",
           "group": "navigation@3"
+        },
+        {
+          "command": "sidebarNotes.openFile",
+          "when": "view == sidebarNotes.view",
+          "group": "navigation@4"
         }
       ]
     },
